@@ -4,8 +4,9 @@
  * User: Alex(Shurik) Pustilnik
  * Date: 8/24/15
  */
+ namespace FeatureToggle;
 
-class FeatureToggle extends ZApplicationComponent {
+class FeatureToggle extends \ZApplicationComponent {
 
 	/**
 	 * @var
