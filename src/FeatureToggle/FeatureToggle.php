@@ -58,7 +58,7 @@ class FeatureToggle extends \ZApplicationComponent {
         try {
 
 
-            $this->featureToggleClient = new LaunchDarkly\LDClient($this->apiKey, array(
+            $this->featureToggleClient = new \LaunchDarkly\LDClient($this->apiKey, array(
                 'timeout' => 10,
                 'connect_timeout' => 10
             ));
@@ -66,7 +66,7 @@ class FeatureToggle extends \ZApplicationComponent {
             $this->setUser();
             $this->setCompany();
 
-            $this->featureToggleUser = new LaunchDarkly\LDUser(
+            $this->featureToggleUser = new \LaunchDarkly\LDUser(
                 $this->user->key,
                 $this->user->secondary,
                 $this->user->ip,
@@ -103,7 +103,7 @@ class FeatureToggle extends \ZApplicationComponent {
             $this->log();
         } catch (\Exception $ex) {
             $this->featureToggleStatusDisable = true;
-            Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", CLogger::LEVEL_WARNING, 'system.featureToggle');
+            \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", CLogger::LEVEL_WARNING, 'system.featureToggle');
         }
 	}
 
@@ -168,7 +168,7 @@ class FeatureToggle extends \ZApplicationComponent {
      * registers the javascript code for the feature toggle
      */
     public function registerScript(){
-        Yii::app()->clientScript->registerScript('featureToggle', $this->clientScript(), CClientScript::POS_END);
+        \Yii::app()->clientScript->registerScript('featureToggle', $this->clientScript(), \CClientScript::POS_END);
     }
 
     /**
@@ -191,30 +191,30 @@ class FeatureToggle extends \ZApplicationComponent {
      */
     protected function log(){
         $logText = app()->user->companyId() . ': ' . json_encode($this->flagStates());
-        Yii::log($logText, CLogger::LEVEL_INFO, 'system.featureToggle');
+        \Yii::log($logText, \CLogger::LEVEL_INFO, 'system.featureToggle');
     }
 
     /**
      * @param CEvent $event
      */
-    public function renderFeatureFlags(CEvent $event){
+    public function renderFeatureFlags(\CEvent $event){
         $flags = json_encode($this->flagStates());
         $output =  "<div class=\"feature-flags hidden\">{$flags}</div>";
         $event->params['output'] = (isset($event->params['output'])) ? $event->params['output'] . $output : $output;
     }
 
     private function setUser(){
-        $this->user = new stdClass();
+        $this->user = new \stdClass();
 
-        $company = new Company();
+        $company = new \Company();
         $company->fetch();
 
-        $user = new User();
+        $user = new \User();
         $user->fetch();
 
         $this->user->key = $company->id;
         $this->user->secondary = null;
-        $this->user->ip = Yii::app()->request->getUserHostAddress();
+        $this->user->ip = \Yii::app()->request->getUserHostAddress();
         $this->user->country = null;
         $this->user->email = $user->email;
         $this->user->name = $company->name;
@@ -229,13 +229,13 @@ class FeatureToggle extends \ZApplicationComponent {
     }
 
     private function setCompany(){
-        $this->parentCompany = new stdClass();
+        $this->parentCompany = new \stdClass();
 
         $this->parentCompany->name  = null;
         $this->parentCompany->email = null;
 
-        $user = new User(false);
-        $company = new Company(false);
+        $user = new \User(false);
+        $company = new \Company(false);
 
         if ( $this->user->parentId ){
             $company->setId( $this->user->parentId );
