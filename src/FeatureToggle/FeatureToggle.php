@@ -1,32 +1,28 @@
 <?php
-/**
- * Behalf
- * User: Alex(Shurik) Pustilnik
- * Date: 8/24/15
- */
- namespace FeatureToggle;
+
+namespace FeatureToggle;
 
 class FeatureToggle extends \ZApplicationComponent {
 
-	/**
-	 * @var
-	 */
-	private $featureToggleClient;
+    /**
+     * @var
+     */
+    private $featureToggleClient;
 
-	/**
-	 * @var
-	 */
-	private $featureToggleUser;
+    /**
+     * @var
+     */
+    private $featureToggleUser;
 
-	/**
-	 * @var string
-	 */
-	public $apiKey;
+    /**
+     * @var string
+     */
+    public $apiKey;
 
-	/**
-	 * @var bool
-	 */
-	public $defaultReturn = false;
+    /**
+     * @var bool
+     */
+    public $defaultReturn = false;
 
     /**
      * @var \GuzzleHttp\Client
@@ -38,22 +34,32 @@ class FeatureToggle extends \ZApplicationComponent {
      */
     public $url;
 
-	/**
-	 * @var bool
-	 */
-	public $featureToggleStatusDisable;
-
     private $user;
 
     private $parentCompany;
 
-	/**
-	 *
-	 */
-	public function init() {
-		parent::init();
+    public $componentActive = true;
 
-		$this->featureToggleStatusDisable = $this->checkFTStatus();
+
+    public function isComponentActive()
+    {
+        if($this->componentActive && $this->checkFTStatusEnabled())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     *
+     */
+    public function init() {
+        parent::init();
+
+        if(!$this->isComponentActive()) {
+            return;
+        }
 
         try {
 
@@ -102,40 +108,44 @@ class FeatureToggle extends \ZApplicationComponent {
             }
             $this->log();
         } catch (\Exception $ex) {
-            $this->featureToggleStatusDisable = true;
+            $this->componentActive = false;
             \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", CLogger::LEVEL_WARNING, 'system.featureToggle');
         }
-	}
+    }
 
-	/**
-	 * Get status from featureToggle if key is enable or disable:
-	 * How to use: app()->featureToggle->isActive("my.key");
-	 *
-	 * @param string $featureKey
-	 * @return bool
-	 *
-	 * DEMO: app()->featureToggle->isActive("my.key")
-	 */
-	public function isActive($featureKey) {
-		if ($this->featureToggleStatusDisable){
-			return $this->defaultReturn;
-		}
-		return $this->featureToggleClient->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
-	}
+    /**
+     * Get status from featureToggle if key is enable or disable:
+     * How to use: app()->featureToggle->isActive("my.key");
+     *
+     * @param string $featureKey
+     * @return bool
+     *
+     * DEMO: app()->featureToggle->isActive("my.key")
+     */
+    public function isActive($featureKey) {
+        if (!$this->isComponentActive()){
+            return $this->defaultReturn;
+        }
+        return $this->featureToggleClient->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
+    }
 
-	/**
-	 * Check Feature Toggle if enable or disable from url param query
-	 *
-	 * @return bool
-	 */
-	private function checkFTStatus () {
-		return isset($_GET["ft_status"]) && $_GET["ft_status"] == "0";
-	}
+    /**
+     * Check Feature Toggle if enable or disable from url param query
+     *
+     * @return bool
+     */
+    private function checkFTStatusEnabled () {
+        if (isset($_GET["ft_status"]) && $_GET["ft_status"] == "0") {
+            return false;
+        }
+
+        return true;
+    }
     /**
      * @return array
      */
     public function flags(){
-        if ($this->featureToggleStatusDisable) {
+        if (!$this->isComponentActive()) {
             return array();
         }
 
