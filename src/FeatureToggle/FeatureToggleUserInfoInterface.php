@@ -26,7 +26,7 @@ interface FeatureToggleUserInfoInterface
 
     public function getFTUserFirstName();
 
-    public function getFTUserLastName();
+    public function getFTUserLastName(); 
 
     public function getFTUserAnonymous();
 
