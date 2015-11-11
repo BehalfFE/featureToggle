@@ -4,29 +4,39 @@
  * User: Alex(Shurik) Pustilnik
  * Date: 8/24/15
  */
- namespace FeatureToggle;
+namespace FeatureToggle;
 
-class FeatureToggle extends \ZApplicationComponent {
+class FeatureToggle extends \CApplicationComponent {
 
-	/**
-	 * @var
-	 */
-	private $featureToggleClient;
+    /**
+     * @var
+     */
+    private $featureToggleClient;
 
-	/**
-	 * @var
-	 */
-	private $featureToggleUser;
+    /**
+     * @var
+     */
+    private $featureToggleUser;
 
-	/**
-	 * @var string
-	 */
-	public $apiKey;
+    /**
+     * @var string
+     */
+    public $apiKey;
 
-	/**
-	 * @var bool
-	 */
-	public $defaultReturn = false;
+    /**
+     * @var FeatureToggleUserInfoInterface
+     */
+    public $userInfo;
+
+    /**
+     * @var Callable
+     */
+    public $userInfoCallable;
+
+    /**
+     * @var bool
+     */
+    public $defaultReturn = false;
 
     /**
      * @var \GuzzleHttp\Client
@@ -38,22 +48,30 @@ class FeatureToggle extends \ZApplicationComponent {
      */
     public $url;
 
-	/**
-	 * @var bool
-	 */
-	public $featureToggleStatusDisable;
+    /**
+     * @var bool
+     */
+    public $featureToggleStatusDisable;
 
+    public $componentActive = true;
+
+    /**
+     * @var Object
+     */
     private $user;
 
+    /**
+     * @var Object
+     */
     private $parentCompany;
 
-	/**
-	 *
-	 */
-	public function init() {
-		parent::init();
+    /**
+     *
+     */
+    public function init() {
+        parent::init();
 
-		$this->featureToggleStatusDisable = $this->checkFTStatus();
+        $this->featureToggleStatusDisable = $this->checkFTStatus();
 
         try {
 
@@ -63,8 +81,10 @@ class FeatureToggle extends \ZApplicationComponent {
                 'connect_timeout' => 10
             ));
 
-            $this->setUser();
-            $this->setCompany();
+            $this->userInfo = call_user_func( $this->userInfoCallable );
+
+            $this->setUser( $this->userInfo );
+
 
             $this->featureToggleUser = new \LaunchDarkly\LDUser(
                 $this->user->key,
@@ -80,8 +100,6 @@ class FeatureToggle extends \ZApplicationComponent {
                 array(
                     'type' => $this->user->type,
                     'parentCompanyId' => $this->user->parentId,
-                    'parentCompanyName' => $this->parentCompany->name,
-                    'parentCompanyEmail' => $this->parentCompany->email,
                     'referredAccountId' => $this->user->referredAccountId,
                     'channel' => $this->user->channel
                 )
@@ -97,40 +115,41 @@ class FeatureToggle extends \ZApplicationComponent {
                 )
             ));
 
-            if (app()->config->testing()) {
+            if (app()->hasProperty('config') && app()->config->testing()) {
                 app()->eventsManager->addEvent('afterRender', array($this, 'renderFeatureFlags'));
             }
-            $this->log();
+            $this->log( $this->userInfo );
         } catch (\Exception $ex) {
             $this->featureToggleStatusDisable = true;
-            \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", CLogger::LEVEL_WARNING, 'system.featureToggle');
+            \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", \CLogger::LEVEL_WARNING, 'system.featureToggle');
         }
-	}
+    }
 
-	/**
-	 * Get status from featureToggle if key is enable or disable:
-	 * How to use: app()->featureToggle->isActive("my.key");
-	 *
-	 * @param string $featureKey
-	 * @return bool
-	 *
-	 * DEMO: app()->featureToggle->isActive("my.key")
-	 */
-	public function isActive($featureKey) {
-		if ($this->featureToggleStatusDisable){
-			return $this->defaultReturn;
-		}
-		return $this->featureToggleClient->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
-	}
+    /**
+     * Get status from featureToggle if key is enable or disable:
+     * How to use: app()->featureToggle->isActive("my.key");
+     *
+     * @param string $featureKey
+     * @return bool
+     *
+     * DEMO: app()->featureToggle->isActive("my.key")
+     */
+    public function isActive($featureKey) {
+        if ($this->featureToggleStatusDisable){
+            return $this->defaultReturn;
+        }
+        return $this->featureToggleClient->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
+    }
 
-	/**
-	 * Check Feature Toggle if enable or disable from url param query
-	 *
-	 * @return bool
-	 */
-	private function checkFTStatus () {
-		return isset($_GET["ft_status"]) && $_GET["ft_status"] == "0";
-	}
+    /**
+     * Check Feature Toggle if enable or disable from url param query
+     *
+     * @return bool
+     */
+    private function checkFTStatus () {
+        return isset($_GET["ft_status"]) && $_GET["ft_status"] == "0";
+    }
+
     /**
      * @return array
      */
@@ -189,8 +208,8 @@ class FeatureToggle extends \ZApplicationComponent {
     /**
      * log feature flags and their state
      */
-    protected function log(){
-        $logText = app()->user->companyId() . ': ' . json_encode($this->flagStates());
+    protected function log( FeatureToggleUserInfoInterface $userInfo ){
+        $logText = $userInfo->getFTUserKey() . ': ' . json_encode($this->flagStates());
         \Yii::log($logText, \CLogger::LEVEL_INFO, 'system.featureToggle');
     }
 
@@ -203,52 +222,26 @@ class FeatureToggle extends \ZApplicationComponent {
         $event->params['output'] = (isset($event->params['output'])) ? $event->params['output'] . $output : $output;
     }
 
-    private function setUser(){
+    private function setUser( FeatureToggleUserInfoInterface $userInfo ){
         $this->user = new \stdClass();
 
-        $company = new \Company();
-        $company->fetch();
+        $this->user->key = $userInfo->getFTUserKey();
+        $this->user->secondary = $userInfo->getFTUserSecondary();
+        $this->user->ip = $userInfo->getFTUserIp();
+        $this->user->country = $userInfo->getFTUserCountry();
+        $this->user->email = $userInfo->getFTUserEmail();
+        $this->user->name = $userInfo->getFTUserName();
+        $this->user->avatar = $userInfo->getFTUserAvatar();
+        $this->user->firstName = $userInfo->getFTUserFirstName();
+        $this->user->lastName = $userInfo->getFTUserLastName();
+        $this->user->anonymous = $userInfo->getFTUserAnonymous();
+        $this->user->parentId = $userInfo->getFTUserParentId();
+        $this->user->type = $userInfo->getFTUserType();
+        $this->user->referredAccountId = $userInfo->getFTUserReferredAccountId();
+        $this->user->channel = $userInfo->getFTUserChannel();
 
-        $user = new \User();
-        $user->fetch();
 
-        $this->user->key = $company->id;
-        $this->user->secondary = null;
-        $this->user->ip = \Yii::app()->request->getUserHostAddress();
-        $this->user->country = null;
-        $this->user->email = $user->email;
-        $this->user->name = $company->name;
-        $this->user->avatar = null;
-        $this->user->firstName = $user->firstName;
-        $this->user->lastName = $user->lastName;
-        $this->user->anonymous = null;
-        $this->user->parentId = $company->parentId;
-        $this->user->type = $company->type["name"];
-        $this->user->referredAccountId = $company->referringCompanyId;
-        $this->user->channel = $company->channel;
     }
 
-    private function setCompany(){
-        $this->parentCompany = new \stdClass();
 
-        $this->parentCompany->name  = null;
-        $this->parentCompany->email = null;
-
-        $user = new \User(false);
-        $company = new \Company(false);
-
-        if ( $this->user->parentId ){
-            $company->setId( $this->user->parentId );
-            $company->fetch();
-
-            if ( $company ) {
-                $this->parentCompany->name  = $company->name;
-
-                $userArray = $user->getUserById($company->userId);
-                if ( $user ) {
-                    $this->parentCompany->email = $userArray['email'];
-                }
-            }
-        }
-    }
 }
