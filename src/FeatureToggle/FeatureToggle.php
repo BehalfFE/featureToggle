@@ -6,7 +6,7 @@
  */
 namespace FeatureToggle;
 
-class FeatureToggle extends \ZApplicationComponent {
+class FeatureToggle extends \CApplicationComponent {
 	/**
 	 * @var
 	 */
@@ -53,11 +53,6 @@ class FeatureToggle extends \ZApplicationComponent {
      * @var Object
      */
     private $user;
-
-    /**
-     * @var Object
-     */
-    private $parentCompany;
 
     private $featuresList;
 
