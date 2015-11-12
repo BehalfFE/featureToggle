@@ -6,17 +6,11 @@
  */
 namespace FeatureToggle;
 
-class FeatureToggle extends \CApplicationComponent {
-
-    /**
-     * @var
-     */
-    private $featureToggleClient;
-
-    /**
-     * @var
-     */
-    private $featureToggleUser;
+class FeatureToggle extends \ZApplicationComponent {
+	/**
+	 * @var
+	 */
+	private $featureToggleUser;
 
     /**
      * @var string
@@ -65,22 +59,17 @@ class FeatureToggle extends \CApplicationComponent {
      */
     private $parentCompany;
 
-    /**
-     *
-     */
+    private $featuresList;
+
+	/**
+	 *
+	 */
     public function init() {
         parent::init();
 
         $this->featureToggleStatusDisable = $this->checkFTStatus();
 
         try {
-
-
-            $this->featureToggleClient = new \LaunchDarkly\LDClient($this->apiKey, array(
-                'timeout' => 10,
-                'connect_timeout' => 10
-            ));
-
             $this->userInfo = call_user_func( $this->userInfoCallable );
 
             $this->setUser( $this->userInfo );
@@ -111,7 +100,9 @@ class FeatureToggle extends \CApplicationComponent {
                     'headers' => array(
                         'Authorization' => "api_key {$this->apiKey}",
                         'Content-Type' => 'application/json',
-                    )
+                    ),
+                    'timeout'         => 10,
+                    'connect_timeout' => 10
                 )
             ));
 
@@ -125,20 +116,30 @@ class FeatureToggle extends \CApplicationComponent {
         }
     }
 
-    /**
-     * Get status from featureToggle if key is enable or disable:
-     * How to use: app()->featureToggle->isActive("my.key");
-     *
-     * @param string $featureKey
-     * @return bool
-     *
-     * DEMO: app()->featureToggle->isActive("my.key")
-     */
+	/**
+	 * Get status from featureToggle if key is enable or disable:
+	 * How to use: app()->featureToggle->isActive("my.key");
+	 *
+	 * @param string $featureKey
+	 * @return bool
+	 *
+	 * DEMO: app()->featureToggle->isActive("my.key")
+	 */
     public function isActive($featureKey) {
+        // Main switch is off
         if ($this->featureToggleStatusDisable){
             return $this->defaultReturn;
         }
-        return $this->featureToggleClient->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
+
+        // Ensure featureList of the user is set
+        $this->fetchUserFeaturesList();
+
+        // Check if requested feature is enabled for the user
+        if ( isset($this->featuresList[$featureKey]) ) {
+            return $this->featuresList[$featureKey]['_value'] == true;
+        }
+
+        return $this->defaultReturn;
     }
 
     /**
@@ -194,7 +195,7 @@ class FeatureToggle extends \CApplicationComponent {
      * @return string
      */
     protected function clientScript(){
-        $flags = json_encode(app()->featureToggle->flagStates());
+        $flags = json_encode( $this->flagStates() );
         return "
             require([
                 'lib/featureToggle'
@@ -240,7 +241,23 @@ class FeatureToggle extends \CApplicationComponent {
         $this->user->referredAccountId = $userInfo->getFTUserReferredAccountId();
         $this->user->channel = $userInfo->getFTUserChannel();
 
+    }
 
+    /**
+     * Retrieve feature list and each feature state corresponding to the current user.
+     */
+    private function fetchUserFeaturesList(){
+        try {
+            $key = $this->featureToggleUser->getKey();
+
+            $response = $this->apiClient->get("/api/users/$key/features");
+            $json_response = $response->json();
+            $this->featuresList = isset( $json_response['items'] ) ? $json_response['items'] : array();
+
+        } catch (\Guzzle\Http\Exception\BadResponseException $e) {
+            $code = $e->getResponse()->getStatusCode();
+            error_log("LDClient::toggle received HTTP status code $code, using default");
+        }
     }
 
 
