@@ -242,6 +242,10 @@ class FeatureToggle extends \CApplicationComponent {
      * Retrieve feature list and each feature state corresponding to the current user.
      */
     private function fetchUserFeaturesList(){
+        if ( is_array($this->featuresList) && count($this->featuresList) > 0 ) {
+            return;
+        }
+
         try {
             $key = $this->featureToggleUser->getKey();
 
