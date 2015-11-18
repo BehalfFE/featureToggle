@@ -42,10 +42,6 @@ class FeatureToggle extends \CApplicationComponent {
      */
     public $url;
 
-    /**
-     * @var bool
-     */
-    public $featureToggleStatusDisable;
 
     public $componentActive = true;
 
@@ -62,7 +58,9 @@ class FeatureToggle extends \CApplicationComponent {
     public function init() {
         parent::init();
 
-        $this->featureToggleStatusDisable = $this->checkFTStatus();
+        if(!$this->isComponentActive()) {
+            return;
+        }
 
         try {
             $this->userInfo = call_user_func( $this->userInfoCallable );
@@ -106,9 +104,19 @@ class FeatureToggle extends \CApplicationComponent {
             }
             $this->log( $this->userInfo );
         } catch (\Exception $ex) {
-            $this->featureToggleStatusDisable = true;
+            $this->componentActive = false;
             \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", \CLogger::LEVEL_WARNING, 'system.featureToggle');
         }
+    }
+
+    public function isComponentActive()
+    {
+        if($this->componentActive && $this->checkFTStatusEnabled())
+        {
+            return true;
+        }
+
+        return false;
     }
 
 	/**
@@ -122,7 +130,7 @@ class FeatureToggle extends \CApplicationComponent {
 	 */
     public function isActive($featureKey) {
         // Main switch is off
-        if ($this->featureToggleStatusDisable){
+        if (!$this->isComponentActive()){
             return $this->defaultReturn;
         }
 
@@ -142,15 +150,19 @@ class FeatureToggle extends \CApplicationComponent {
      *
      * @return bool
      */
-    private function checkFTStatus () {
-        return isset($_GET["ft_status"]) && $_GET["ft_status"] == "0";
+    private function checkFTStatusEnabled () {
+        if (isset($_GET["ft_status"]) && $_GET["ft_status"] == "0") {
+            return false;
+        }
+
+        return true;
     }
 
     /**
      * @return array
      */
     public function flags(){
-        if ($this->featureToggleStatusDisable) {
+        if (!$this->isComponentActive()) {
             return array();
         }
 
