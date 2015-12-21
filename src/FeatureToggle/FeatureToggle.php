@@ -6,11 +6,13 @@
  */
 namespace FeatureToggle;
 
+use LaunchDarkly\LDClient;
+
 class FeatureToggle extends \CApplicationComponent {
-	/**
-	 * @var
-	 */
-	private $featureToggleUser;
+    /**
+     * @var
+     */
+    private $featureToggleUser;
 
     /**
      * @var string
@@ -33,11 +35,6 @@ class FeatureToggle extends \CApplicationComponent {
     public $defaultReturn = false;
 
     /**
-     * @var \GuzzleHttp\Client
-     */
-    private $apiClient;
-
-    /**
      * @var string
      */
     public $url;
@@ -50,11 +47,14 @@ class FeatureToggle extends \CApplicationComponent {
      */
     private $user;
 
-    private $featuresList;
+    /**
+     * @var LDClient
+     */
+    private $client;
 
-	/**
-	 *
-	 */
+    /**
+     *
+     */
     public function init() {
         parent::init();
 
@@ -68,41 +68,26 @@ class FeatureToggle extends \CApplicationComponent {
             $this->setUser( $this->userInfo );
 
 
-            $this->featureToggleUser = new \LaunchDarkly\LDUser(
-                $this->user->key,
-                $this->user->secondary,
-                $this->user->ip,
-                $this->user->country,
-                $this->user->email,
-                $this->user->name,
-                $this->user->avatar,
-                $this->user->firstName,
-                $this->user->lastName,
-                $this->user->anonymous,
-                array(
+            $this->client = new \LaunchDarkly\LDClient($this->apiKey);
+
+            $this->featureToggleUser = (new \LaunchDarkly\LDUserBuilder($this->user->key))
+                ->secondary($this->user->secondary)
+                ->ip($this->user->ip)
+                ->country($this->user->country)
+                ->email($this->user->email)
+                ->name($this->user->name)
+                ->avatar($this->user->avatar)
+                ->firstName($this->user->firstName)
+                ->lastName($this->user->lastName)
+                ->anonymous($this->user->anonymous)
+                ->custom(array(
                     'type' => $this->user->type,
                     'parentCompanyId' => $this->user->parentId,
                     'referredAccountId' => $this->user->referredAccountId,
                     'channel' => $this->user->channel
-                )
-            );
+                ))
+                ->build();
 
-            $this->apiClient = new \GuzzleHttp\Client(array(
-                'base_url' => $this->url,
-                'defaults' => array(
-                    'headers' => array(
-                        'Authorization' => "api_key {$this->apiKey}",
-                        'Content-Type' => 'application/json',
-                    ),
-                    'timeout'         => 10,
-                    'connect_timeout' => 10
-                )
-            ));
-
-            if (app()->hasProperty('config') && app()->config->testing()) {
-                app()->eventsManager->addEvent('afterRender', array($this, 'renderFeatureFlags'));
-            }
-            $this->log( $this->userInfo );
         } catch (\Exception $ex) {
             $this->componentActive = false;
             \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", \CLogger::LEVEL_WARNING, 'system.featureToggle');
@@ -111,7 +96,7 @@ class FeatureToggle extends \CApplicationComponent {
 
     public function isComponentActive()
     {
-        if($this->componentActive && $this->checkFTStatusEnabled())
+        if($this->componentActive)
         {
             return true;
         }
@@ -119,43 +104,22 @@ class FeatureToggle extends \CApplicationComponent {
         return false;
     }
 
-	/**
-	 * Get status from featureToggle if key is enable or disable:
-	 * How to use: app()->featureToggle->isActive("my.key");
-	 *
-	 * @param string $featureKey
-	 * @return bool
-	 *
-	 * DEMO: app()->featureToggle->isActive("my.key")
-	 */
+    /**
+     * Get status from featureToggle if key is enable or disable:
+     * How to use: app()->featureToggle->isActive("my.key");
+     *
+     * @param string $featureKey
+     * @return bool
+     *
+     * DEMO: app()->featureToggle->isActive("my.key")
+     */
     public function isActive($featureKey) {
         // Main switch is off
         if (!$this->isComponentActive()){
             return $this->defaultReturn;
         }
 
-        // Ensure featureList of the user is set
-        $this->fetchUserFeaturesList();
-
-        // Check if requested feature is enabled for the user
-        if ( isset($this->featuresList[$featureKey]) ) {
-            return $this->featuresList[$featureKey]['_value'] == true;
-        }
-
-        return $this->defaultReturn;
-    }
-
-    /**
-     * Check Feature Toggle if enable or disable from url param query
-     *
-     * @return bool
-     */
-    private function checkFTStatusEnabled () {
-        if (isset($_GET["ft_status"]) && $_GET["ft_status"] == "0") {
-            return false;
-        }
-
-        return true;
+        return $this->client->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
     }
 
     /**
@@ -166,7 +130,19 @@ class FeatureToggle extends \CApplicationComponent {
             return array();
         }
 
-        $response = $this->apiClient->get('features');
+        $apiClient = new \GuzzleHttp\Client(array(
+            'base_url' => $this->url,
+            'defaults' => array(
+                'headers' => array(
+                    'Authorization' => "api_key {$this->apiKey}",
+                    'Content-Type' => 'application/json',
+                ),
+                'timeout'         => 10,
+                'connect_timeout' => 10
+            )
+        ));
+
+        $response = $apiClient->get('features');
         $flags = $response->json();
 
         $flagKeys = array();
@@ -181,54 +157,13 @@ class FeatureToggle extends \CApplicationComponent {
      * @return array
      */
     public function flagStates(){
-        $flags = $this->flags();
-
-        $flagStates = array();
-        foreach($flags as $flag){
-            $flagStates[$flag] = $this->isActive($flag);
-        }
-
-        return $flagStates;
+        return array();
     }
 
     /**
      * registers the javascript code for the feature toggle
      */
-    public function registerScript(){
-        \Yii::app()->clientScript->registerScript('featureToggle', $this->clientScript(), \CClientScript::POS_END);
-    }
-
-    /**
-     * @return string
-     */
-    protected function clientScript(){
-        $flags = json_encode( $this->flagStates() );
-        return "
-            require([
-                'lib/featureToggle'
-            ], function(ft){
-                var flags = {$flags};
-                ft.init(flags);
-            });
-        ";
-    }
-
-    /**
-     * log feature flags and their state
-     */
-    protected function log( FeatureToggleUserInfoInterface $userInfo ){
-        $logText = $userInfo->getFTUserKey() . ': ' . json_encode($this->flagStates());
-        \Yii::log($logText, \CLogger::LEVEL_INFO, 'system.featureToggle');
-    }
-
-    /**
-     * @param CEvent $event
-     */
-    public function renderFeatureFlags(\CEvent $event){
-        $flags = json_encode($this->flagStates());
-        $output =  "<div class=\"feature-flags hidden\">{$flags}</div>";
-        $event->params['output'] = (isset($event->params['output'])) ? $event->params['output'] . $output : $output;
-    }
+    public function registerScript(){}
 
     private function setUser( FeatureToggleUserInfoInterface $userInfo ){
         $this->user = new \stdClass();
@@ -248,27 +183,6 @@ class FeatureToggle extends \CApplicationComponent {
         $this->user->referredAccountId = $userInfo->getFTUserReferredAccountId();
         $this->user->channel = $userInfo->getFTUserChannel();
 
-    }
-
-    /**
-     * Retrieve feature list and each feature state corresponding to the current user.
-     */
-    private function fetchUserFeaturesList(){
-        if ( is_array($this->featuresList) && count($this->featuresList) > 0 ) {
-            return;
-        }
-
-        try {
-            $key = $this->featureToggleUser->getKey();
-
-            $response = $this->apiClient->get("/api/users/$key/features");
-            $json_response = $response->json();
-            $this->featuresList = isset( $json_response['items'] ) ? $json_response['items'] : array();
-
-        } catch (\Guzzle\Http\Exception\BadResponseException $e) {
-            $code = $e->getResponse()->getStatusCode();
-            error_log("LDClient::toggle received HTTP status code $code, using default");
-        }
     }
 
 
