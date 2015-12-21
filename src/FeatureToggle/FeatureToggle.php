@@ -6,11 +6,13 @@
  */
 namespace FeatureToggle;
 
+use LaunchDarkly\LDClient;
+
 class FeatureToggle extends \CApplicationComponent {
-	/**
-	 * @var
-	 */
-	private $featureToggleUser;
+    /**
+     * @var
+     */
+    private $featureToggleUser;
 
     /**
      * @var string
@@ -52,9 +54,14 @@ class FeatureToggle extends \CApplicationComponent {
 
     private $featuresList;
 
-	/**
-	 *
-	 */
+    /**
+     * @var LDClient
+     */
+    private $client;
+
+    /**
+     *
+     */
     public function init() {
         parent::init();
 
@@ -68,24 +75,25 @@ class FeatureToggle extends \CApplicationComponent {
             $this->setUser( $this->userInfo );
 
 
-            $this->featureToggleUser = new \LaunchDarkly\LDUser(
-                $this->user->key,
-                $this->user->secondary,
-                $this->user->ip,
-                $this->user->country,
-                $this->user->email,
-                $this->user->name,
-                $this->user->avatar,
-                $this->user->firstName,
-                $this->user->lastName,
-                $this->user->anonymous,
-                array(
+            $this->client = new \LaunchDarkly\LDClient($this->apiKey);
+
+            $this->featureToggleUser = (new \LaunchDarkly\LDUserBuilder($this->user->key))
+                ->secondary($this->user->secondary)
+                ->ip($this->user->ip)
+                ->country($this->user->country)
+                ->email($this->user->email)
+                ->name($this->user->name)
+                ->avatar($this->user->avatar)
+                ->firstName($this->user->firstName)
+                ->lastName($this->user->lastName)
+                ->anonymous($this->user->anonymous)
+                ->custom(array(
                     'type' => $this->user->type,
                     'parentCompanyId' => $this->user->parentId,
                     'referredAccountId' => $this->user->referredAccountId,
                     'channel' => $this->user->channel
-                )
-            );
+                ))
+                ->build();
 
             $this->apiClient = new \GuzzleHttp\Client(array(
                 'base_url' => $this->url,
@@ -100,7 +108,7 @@ class FeatureToggle extends \CApplicationComponent {
             ));
 
             if (app()->hasProperty('config') && app()->config->testing()) {
-                app()->eventsManager->addEvent('afterRender', array($this, 'renderFeatureFlags'));
+                //app()->eventsManager->addEvent('afterRender', array($this, 'renderFeatureFlags'));
             }
             $this->log( $this->userInfo );
         } catch (\Exception $ex) {
@@ -119,30 +127,22 @@ class FeatureToggle extends \CApplicationComponent {
         return false;
     }
 
-	/**
-	 * Get status from featureToggle if key is enable or disable:
-	 * How to use: app()->featureToggle->isActive("my.key");
-	 *
-	 * @param string $featureKey
-	 * @return bool
-	 *
-	 * DEMO: app()->featureToggle->isActive("my.key")
-	 */
+    /**
+     * Get status from featureToggle if key is enable or disable:
+     * How to use: app()->featureToggle->isActive("my.key");
+     *
+     * @param string $featureKey
+     * @return bool
+     *
+     * DEMO: app()->featureToggle->isActive("my.key")
+     */
     public function isActive($featureKey) {
         // Main switch is off
         if (!$this->isComponentActive()){
             return $this->defaultReturn;
         }
 
-        // Ensure featureList of the user is set
-        $this->fetchUserFeaturesList();
-
-        // Check if requested feature is enabled for the user
-        if ( isset($this->featuresList[$featureKey]) ) {
-            return $this->featuresList[$featureKey]['_value'] == true;
-        }
-
-        return $this->defaultReturn;
+        return $this->client->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
     }
 
     /**
@@ -181,6 +181,7 @@ class FeatureToggle extends \CApplicationComponent {
      * @return array
      */
     public function flagStates(){
+        return array();
         $flags = $this->flags();
 
         $flagStates = array();
@@ -195,7 +196,7 @@ class FeatureToggle extends \CApplicationComponent {
      * registers the javascript code for the feature toggle
      */
     public function registerScript(){
-        \Yii::app()->clientScript->registerScript('featureToggle', $this->clientScript(), \CClientScript::POS_END);
+        //\Yii::app()->clientScript->registerScript('featureToggle', $this->clientScript(), \CClientScript::POS_END);
     }
 
     /**
