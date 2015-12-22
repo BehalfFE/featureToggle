@@ -87,8 +87,7 @@ class FeatureToggle extends \CApplicationComponent {
                     'channel' => $this->user->channel
                 ))
                 ->build();
-
-        } catch (\Exception $ex) {
+         } catch (\Exception $ex) {
             $this->componentActive = false;
             \Yii::log("Cannot initiate Feature Toggles: {$ex->getMessage()}", \CLogger::LEVEL_WARNING, 'system.featureToggle');
         }
