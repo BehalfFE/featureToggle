@@ -118,6 +118,12 @@ class FeatureToggle extends \CApplicationComponent {
             return $this->defaultReturn;
         }
 
+        if( function_exists('info') ){
+            $userId=$this->userInfo->getFTUserKey();
+            $output = "[featureKey={$featureKey}] [userId={$userId}]";
+            info($output);
+        }
+
         return $this->client->toggle($featureKey, $this->featureToggleUser, $this->defaultReturn);
     }
 
