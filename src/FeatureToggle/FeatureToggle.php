@@ -68,7 +68,19 @@ class FeatureToggle extends \CApplicationComponent {
             $this->setUser( $this->userInfo );
 
 
-            $this->client = new \LaunchDarkly\LDClient($this->apiKey);
+           // $memcached = new \CMemCache()->getca
+
+            $memcached = new \Memcached();
+            $memcached->addServer('localhost', 11211);
+
+            $cacheDriver = new \Doctrine\Common\Cache\MemcachedCache();
+            $cacheDriver->setMemcached($memcached);
+            $cacheStorage = new \Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage($cacheDriver);
+
+            $this->client = new \LaunchDarkly\LDClient($this->apiKey, array("cache" => $cacheStorage));
+
+
+          //  $this->client = new \LaunchDarkly\LDClient($this->apiKey);
 
             $this->featureToggleUser = (new \LaunchDarkly\LDUserBuilder($this->user->key))
                 ->secondary($this->user->secondary)
@@ -113,6 +125,7 @@ class FeatureToggle extends \CApplicationComponent {
      * DEMO: app()->featureToggle->isActive("my.key")
      */
     public function isActive($featureKey) {
+
         // Main switch is off
         if (!$this->isComponentActive()){
             return $this->defaultReturn;
