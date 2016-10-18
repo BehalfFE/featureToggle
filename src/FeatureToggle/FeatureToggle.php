@@ -70,9 +70,9 @@ class FeatureToggle extends \CApplicationComponent {
 
 
 
-            $memcached = new Memcached();
+            $memcached = new \Memcached();
 
-            $memcached->addServer('localhost', 11211);
+            $memcached->addServer('memcache', 11211);
 
             $cacheDriver = new \Doctrine\Common\Cache\MemcachedCache();
             $cacheDriver->setMemcached($memcached);
