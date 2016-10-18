@@ -68,9 +68,10 @@ class FeatureToggle extends \CApplicationComponent {
             $this->setUser( $this->userInfo );
 
 
-           // $memcached = new \CMemCache()->getca
 
-            $memcached = new \Memcached();
+
+            $memcached = new Memcached();
+
             $memcached->addServer('localhost', 11211);
 
             $cacheDriver = new \Doctrine\Common\Cache\MemcachedCache();
@@ -81,6 +82,7 @@ class FeatureToggle extends \CApplicationComponent {
 
 
           //  $this->client = new \LaunchDarkly\LDClient($this->apiKey);
+
 
             $this->featureToggleUser = (new \LaunchDarkly\LDUserBuilder($this->user->key))
                 ->secondary($this->user->secondary)
