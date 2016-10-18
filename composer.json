@@ -7,9 +7,7 @@
     "require": {
         "php": ">=5.3.0",
         "yiisoft/yii": "1.1.14",
-        "launchdarkly/launchdarkly-php": "dev-master"
-       // "guzzlehttp/guzzle": "6.2.1"
-        //   "kevinrob/guzzle-cache-middleware": "v1.4.3"
+        "launchdarkly/launchdarkly-php": "dev-master"     
     },
     "autoload": {
         "psr-4": {
