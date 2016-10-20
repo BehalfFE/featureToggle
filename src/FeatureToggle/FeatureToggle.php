@@ -53,8 +53,12 @@ class FeatureToggle extends \CApplicationComponent {
     private $client;
 
     /**
-     *
+     * @var array
      */
+     public $cacheServer;
+
+
+
     public function init() {
         parent::init();
 
@@ -67,21 +71,23 @@ class FeatureToggle extends \CApplicationComponent {
 
             $this->setUser( $this->userInfo );
 
+            $memcacheServerName = $this->cacheServer['host'];
+            $memcacheServerPort = $this->cacheServer['port'];
 
-
-
-            $memcached = new \Memcached();
-
-            $memcached->addServer('memcache', 11211);
-
-            $cacheDriver = new \Doctrine\Common\Cache\MemcachedCache();
-            $cacheDriver->setMemcached($memcached);
-            $cacheStorage = new \Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage($cacheDriver);
+            if($memcacheServerName && $memcacheServerPort) {
+                $memcached = new \Memcached();
+                $memcached->addServer($memcacheServerName, $memcacheServerPort);
+                $cacheDriver = new \Doctrine\Common\Cache\MemcachedCache();
+                $cacheDriver->setMemcached($memcached);
+                $cacheStorage = new \Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage($cacheDriver);
+            }
+            else{
+                $cacheStorage =  new \Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage(
+                                   new \Doctrine\Common\Cache\FilesystemCache('/tmp/')
+                                 );
+            }
 
             $this->client = new \LaunchDarkly\LDClient($this->apiKey, array("cache" => $cacheStorage));
-
-
-          //  $this->client = new \LaunchDarkly\LDClient($this->apiKey);
 
 
             $this->featureToggleUser = (new \LaunchDarkly\LDUserBuilder($this->user->key))

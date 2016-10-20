@@ -7,7 +7,7 @@
     "require": {
         "php": ">=5.3.0",
         "yiisoft/yii": "1.1.14",
-        "launchdarkly/launchdarkly-php": "dev-master",
+        "launchdarkly/launchdarkly-php": "2.0.*",
         "guzzlehttp/guzzle": "6.2.1",
         "kevinrob/guzzle-cache-middleware": "1.4.1",
         "doctrine/cache":"~1.3"
