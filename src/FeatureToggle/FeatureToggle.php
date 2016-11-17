@@ -104,7 +104,8 @@ class FeatureToggle extends \CApplicationComponent {
                     'type' => $this->user->type,
                     'parentCompanyId' => $this->user->parentId,
                     'referredAccountId' => $this->user->referredAccountId,
-                    'channel' => $this->user->channel
+                    'channel' => $this->user->channel,
+                    'payoutMethod' => (isset($this->user->payoutMethod)) ? $this->user->payoutMethod : null
                 ))
                 ->build();
          } catch (\Exception $ex) {
@@ -208,7 +209,9 @@ class FeatureToggle extends \CApplicationComponent {
         $this->user->type = $userInfo->getFTUserType();
         $this->user->referredAccountId = $userInfo->getFTUserReferredAccountId();
         $this->user->channel = $userInfo->getFTUserChannel();
-
+        if(method_exists($userInfo, 'getFTUserPayoutMethod')){
+            $this->user->payoutMethod = $userInfo->getFTUserPayoutMethod();
+        }
     }
 
 
