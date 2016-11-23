@@ -57,6 +57,13 @@ class FeatureToggle extends \CApplicationComponent {
      */
      public $cacheServer;
 
+    /**
+     * @var number
+     *
+     */
+     public $connect_timeout;
+
+
 
 
     public function init() {
@@ -87,7 +94,8 @@ class FeatureToggle extends \CApplicationComponent {
                                  );
             }
 
-            $this->client = new \LaunchDarkly\LDClient($this->apiKey, array("cache" => $cacheStorage));
+            $this->client = new \LaunchDarkly\LDClient($this->apiKey, array("cache" => $cacheStorage,
+                                                                            "connect_timeout" => $this->connect_timeout));
 
 
             $this->featureToggleUser = (new \LaunchDarkly\LDUserBuilder($this->user->key))
